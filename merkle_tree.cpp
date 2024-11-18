@@ -191,6 +191,7 @@ int main()
 
     // Display the tree
     cout << "Merkle Tree:" << endl;
+    // cout << "working??" << endl;
     displayTree(root);
     return 0;
 }
