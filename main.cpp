@@ -1,5 +1,5 @@
 /**
- * @file merkle_tree.cpp
+ * @file main.cpp
  *
  * Boiler Blockchain Project - Merkle Tree Implementation
  *
@@ -85,9 +85,10 @@ MerkleNode *build_merkle_tree(vector<string> data_blocks)
    * Step 1: Adjust the data blocks vector to have a size 2^k. Pad with "_"s at the end if needed.
    */
 
-   while ((data_blocks.size() & (data_blocks.size() - 1)) != 0) {
+  while ((data_blocks.size() & (data_blocks.size() - 1)) != 0)
+  {
     data_blocks.push_back("_");
-    }
+  }
 
   /*
    * Step 2: Build the tree.
@@ -95,14 +96,13 @@ MerkleNode *build_merkle_tree(vector<string> data_blocks)
    * some starter code for that approach.
    */
 
-  
   vector<MerkleNode *> nodes;
   for (int i = 0; i < data_blocks.size(); i++)
   {
     // make a leaf node for each data block
     nodes.push_back(new MerkleNode(simple_hash(data_blocks[i])));
   }
-  while (data_blocks.size() > 1)
+  while (nodes.size() > 1)
   {
     /*
      * 1. Combine hashes for the first 2 elements. Pop the first 2 elements from the nodes array.
@@ -110,20 +110,20 @@ MerkleNode *build_merkle_tree(vector<string> data_blocks)
      * 3. Append at the end of the nodes array.
      *
      */
-      MerkleNode *left = nodes[0];
-      MerkleNode *right = nodes[1];
+    MerkleNode *left = nodes[0];
+    MerkleNode *right = nodes[1];
 
-      string parent_hash = combine_hashes(left->hash, right->hash);
-      MerkleNode *parent = new MerkleNode(parent_hash);
-      parent->left = left;
-      parent->right = right;
-      left->parent = parent;
-      right->parent = parent;
+    string parent_hash = combine_hashes(left->hash, right->hash);
+    MerkleNode *parent = new MerkleNode(parent_hash);
+    parent->left = left;
+    parent->right = right;
+    left->parent = parent;
+    right->parent = parent;
 
-      nodes.erase(nodes.begin());
-      nodes.erase(nodes.begin());
+    nodes.erase(nodes.begin());
+    nodes.erase(nodes.begin());
 
-      nodes.push_back(parent);
+    nodes.push_back(parent);
   }
   // Yay
   return nodes[0];
@@ -134,46 +134,52 @@ MerkleNode *build_merkle_tree(vector<string> data_blocks)
  * This is very useful in verifying if an element belongs to a pre-determined set in O(logn)
  * Example: Airdropping tokens to addresses
  */
-vector<string> generate_merkle_proof(MerkleNode *root, MerkleNode *leaf)
+vector<pair<string, bool>> generate_merkle_proof(MerkleNode *root, MerkleNode *leaf)
 {
-  vector<string> proof;
+  vector<pair<string, bool>> proof;
   /*
    * 1. Traverse from leaf to root
    * 2. In the process, get the sibling's hash of each node and push it in the proof.
    */
 
   MerkleNode *newNode = leaf;
-  while (newNode->parent != nullptr) {
-        MerkleNode *sibling = (newNode->parent->left == newNode) ? newNode->parent->right : newNode->parent->left;
-        proof.push_back(sibling->hash); 
-        newNode = newNode->parent;     
-    }
+  while (newNode->parent != nullptr)
+  {
+    bool is_left_sibling = (newNode->parent->left == newNode);
+    MerkleNode *sibling = is_left_sibling
+                              ? newNode->parent->right
+                              : newNode->parent->left;
+
+    proof.push_back({sibling->hash, !is_left_sibling});
+    newNode = newNode->parent;
+  }
   return proof;
 }
 
 /*
  * Merkle verification in O(logn time)
  */
-bool verify(MerkleNode *root, MerkleNode *leaf, vector<string>merkle_proof)
+bool verify(MerkleNode *root, MerkleNode *leaf, vector<pair<string, bool>> merkle_proof)
 {
   /*
-  * 1. Traverse from leaf to root
-  * 2. Verify that sibling hash matches the merkle proof at the right index
-  */
+   * 1. Traverse from leaf to root
+   * 2. Verify that sibling hash matches the merkle proof at the right index
+   */
 
-   string current_hash = leaf->hash;
+  string current_hash = leaf->hash;
 
-   for (const string &sibling_hash : merkle_proof) {
-        if (current_hash < sibling_hash) {
-            current_hash = combine_hashes(current_hash, sibling_hash);
-        } else {
-            current_hash = combine_hashes(sibling_hash, current_hash);
-        }
-    }
+  for (const auto &[sibling_hash, is_left_sibling] : merkle_proof)
+  {
+    // Combine hashes based on whether the current node is left or right
+    string parent_hash = is_left_sibling
+                             ? combine_hashes(sibling_hash, current_hash)  // sibling is left
+                             : combine_hashes(current_hash, sibling_hash); // sibling is right
+    current_hash = parent_hash;
+  }
 
-
- // Returning true if no discrepancy found
-  if (current_hash != root->hash){
+  // Returning true if no discrepancy found
+  if (current_hash != root->hash)
+  {
     return false;
   }
   return true;
@@ -187,10 +193,14 @@ int main()
    * MerkleNode* root = build_merkle_tree(data_blocks);
    */
 
-   MerkleNode *root = build_merkle_tree(data_blocks);
+  MerkleNode *root = build_merkle_tree(data_blocks);
 
-    cout << "Merkle Tree:" << endl;
-    //std::cout << root << std::endl;
-    displayTree(root);
-    return 0;
+  cout << "Merkle Tree:" << endl;
+  // std::cout << root << std::endl;
+  displayTree(root);
+  vector<pair<string, bool>>proof = generate_merkle_proof(root, root->right->right);
+  cout << verify(root, root->right->right, proof) << endl;  // should be 1
+  cout << verify(root, root->right->left, proof) << endl;   //should be 0
+
+  return 0;
 }
